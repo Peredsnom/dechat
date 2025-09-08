@@ -15,7 +15,13 @@ app.use('/api', createProxyMiddleware({
   ws: true // Поддержка WebSocket для Socket.io
 }));
 
-// Проксирование Socket.io
+// Проксирование Socket.io статических файлов
+app.use('/socket.io/socket.io.js', createProxyMiddleware({
+  target: 'http://localhost:3000',
+  changeOrigin: true
+}));
+
+// Проксирование Socket.io WebSocket соединений
 app.use('/socket.io', createProxyMiddleware({
   target: 'http://localhost:3000',
   changeOrigin: true,
