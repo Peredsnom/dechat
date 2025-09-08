@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeChat - Тест чата</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+            min-height: 600px;
+        }
+        
+        .header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .auth-section, .chat-section {
+            padding: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background: #5a6fd8;
+        }
+        
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .message.own {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            text-align: right;
+        }
+        
+        .message-header {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .message-content {
+            font-size: 14px;
+        }
+        
+        .send-form {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .send-form input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        
+        .send-form button {
+            width: auto;
+            padding: 12px 20px;
+            margin-bottom: 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .user-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .logout-btn {
+            background: #dc3545;
+            font-size: 14px;
+            padding: 8px 16px;
+            width: auto;
+            margin: 10px auto 0 auto;
+            display: block;
+        }
+        
+        .logout-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗨️ DeChat</h1>
+            <p>Корпоративный чат</p>
+        </div>
+        
+        <!-- Секция авторизации -->
+        <div id="authSection" class="auth-section">
+            <div id="statusMessage" class="status hidden"></div>
+            
+            <div id="loginForm">
+                <h3>Вход в систему</h3>
+                <form id="login">
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль:</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit">Войти</button>
+                </form>
+                <button onclick="showRegister()">Нет аккаунта? Регистрация</button>
+            </div>
+            
+            <div id="registerForm" class="hidden">
+                <h3>Регистрация</h3>
+                <form id="register">
+                    <div class="form-group">
+                        <label>Имя:</label>
+                        <input type="text" id="registerName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="registerEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль:</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <button type="submit">Зарегистрироваться</button>
+                </form>
+                <button onclick="showLogin()">Уже есть аккаунт? Войти</button>
+            </div>
+        </div>
+        
+        <!-- Секция чата -->
+        <div id="chatSection" class="chat-section hidden">
+            <div class="user-info">
+                <div>Добро пожаловать, <span id="userName"></span>!</div>
+                <button class="logout-btn" onclick="logout()">Выйти</button>
+            </div>
+            
+            <div class="messages" id="messages"></div>
+            
+            <form class="send-form" id="messageForm">
+                <input type="text" id="messageInput" placeholder="Введите сообщение..." required>
+                <button type="submit">Отправить</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let currentUser = null;
+        let authToken = null;
+        const defaultChatId = 'general'; // Общий чат для всех
+
+        // Переключение между формами
+        function showRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function showStatus(message, isError = false) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status ${isError ? 'error' : 'success'}`;
+            statusEl.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusEl.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Регистрация
+        document.getElementById('register').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus('Регистрация успешна! Теперь войдите в систему.');
+                    showLogin();
+                } else {
+                    showStatus(data.message || 'Ошибка регистрации', true);
+                }
+            } catch (error) {
+                showStatus('Ошибка сети', true);
+            }
+        });
+
+        // Авторизация
+        document.getElementById('login').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentUser = data.user;
+                    authToken = data.token;
+                    showChat();
+                } else {
+                    showStatus(data.message || 'Ошибка входа', true);
+                }
+            } catch (error) {
+                showStatus('Ошибка сети', true);
+            }
+        });
+
+        // Показать чат
+        function showChat() {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('chatSection').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.name;
+            
+            initializeSocket();
+        }
+
+        // Инициализация Socket.io
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Подключен к серверу');
+                socket.emit('join_chat', defaultChatId);
+            });
+
+            socket.on('new_message', (message) => {
+                displayMessage(message);
+            });
+
+            socket.on('error', (error) => {
+                console.error('Socket error:', error);
+            });
+        }
+
+        // Отправка сообщения
+        document.getElementById('messageForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const messageInput = document.getElementById('messageInput');
+            const messageText = messageInput.value.trim();
+            
+            if (messageText && socket) {
+                const messageData = {
+                    chatId: defaultChatId,
+                    encryptedMessage: messageText, // В реальном приложении здесь должно быть шифрование
+                    senderId: currentUser.id
+                };
+                
+                socket.emit('send_message', messageData);
+                messageInput.value = '';
+            }
+        });
+
+        // Отображение сообщения
+        function displayMessage(message) {
+            const messagesContainer = document.getElementById('messages');
+            const messageEl = document.createElement('div');
+            
+            const isOwnMessage = message.senderId === currentUser.id;
+            messageEl.className = `message ${isOwnMessage ? 'own' : ''}`;
+            
+            const time = new Date(message.timestamp).toLocaleTimeString();
+            const senderName = isOwnMessage ? 'Вы' : 'Пользователь';
+            
+            messageEl.innerHTML = `
+                <div class="message-header">${senderName} • ${time}</div>
+                <div class="message-content">${message.encryptedContent}</div>
+            `;
+            
+            messagesContainer.appendChild(messageEl);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Выход
+        function logout() {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            currentUser = null;
+            authToken = null;
+            
+            document.getElementById('chatSection').classList.add('hidden');
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('messages').innerHTML = '';
+            
+            // Очистка форм
+            document.getElementById('loginEmail').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('registerName').value = '';
+            document.getElementById('registerEmail').value = '';
+            document.getElementById('registerPassword').value = '';
+        }
+    </script>
+</body>
+</html>
