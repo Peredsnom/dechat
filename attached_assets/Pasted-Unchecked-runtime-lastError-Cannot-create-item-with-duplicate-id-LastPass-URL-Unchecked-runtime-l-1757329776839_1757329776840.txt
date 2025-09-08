@@ -1,0 +1,68 @@
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass <URL>
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://cloud.mongodb.com/v2/68beb5701aa56371978f3f04
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id separator https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id separator https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Item https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Item https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Password https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Address https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Payment Card https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Add other item https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Save all entered data https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Password https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Address https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Payment Card https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Add other item https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Save all entered data https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id Generate Secure Password https://bit.engicore.org/bizproc/userprocesses/?login=yes
+Unchecked runtime.lastError: Cannot create item with duplicate id Generate Secure Password https://bit.engicore.org/company/personal/bizproc/109636/?USER_ID=1&IFRAME=Y&IFRAME_TYPE=SIDE_SLIDER
+Unchecked runtime.lastError: Cannot create item with duplicate id separator https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Item https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Password https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Address https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Payment Card https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Add other item https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Save all entered data https://github.com/new
+Unchecked runtime.lastError: Cannot create item with duplicate id Generate Secure Password https://github.com/new
+background-redux-new.js:2 Error: Invalid frameId for foreground frameId: 0
+    at ae (background-redux-new.js:2:7791913)
+    at h (background-redux-new.js:2:7858816)
+    at background-redux-new.js:2:7859818
+ae @ background-redux-new.js:2
+background-redux-new.js:1 Uncaught (in promise) Error: No tab with id: 534175473.
+3background-redux-new.js:2 Error: Invalid frameId for foreground frameId: 0
+    at ae (background-redux-new.js:2:7791913)
+    at h (background-redux-new.js:2:7858816)
+    at background-redux-new.js:2:7859818
+ae @ background-redux-new.js:2
+Unchecked runtime.lastError: Cannot create item with duplicate id separator https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Item https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Password https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Address https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Payment Card https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Add other item https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Save all entered data https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+Unchecked runtime.lastError: Cannot create item with duplicate id Generate Secure Password https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html
+15Unchecked runtime.lastError: Cannot find menu item with id LastPass <URL>
+25Unchecked runtime.lastError: Cannot find menu item with id Add Item <URL>
+ff121744-2e31-4c05-954b-2502f9cb7c87-00-mc5mkbi0i1cp.kirk.replit.dev/:1 Failed to find a valid digest in the 'integrity' attribute for resource 'https://cdn.socket.io/4.7.2/socket.io.min.js' with computed SHA-384 integrity 'mZLF4UVrpi/QTWPA7BjNPEnkIfRFn4ZEO3Qt/HFklTJBj/gBOV8G3HcKn4NfQblz'. The resource has been blocked.
+inpage.js:167 TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at 69150 (inpage.js:167:69630)
+    at r (inpage.js:173:10282)
+    at inpage.js:173:10964
+    at inpage.js:173:10974
+    at inpage.js:173:10978
+inpage.js:167 Uncaught (in promise) TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at inpage.js:167:69019
+/api/auth/register:1 
+            
+            
+           Failed to load resource: the server responded with a status of 404 (Not Found)

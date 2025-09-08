@@ -51,14 +51,33 @@ app.use('/api/chat', chatRoutes);
 // Socket.IO обработчики
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
+  
+  // Автоматически присоединяем к общему чату
+  socket.join('general');
 
-  // Присоединение к комнате чата
+  // Простой анонимный чат
+  socket.on('message', (data) => {
+    console.log('📨 Message received:', data);
+    // Ретрансляция всем подключенным пользователям
+    socket.broadcast.emit('message', {
+      type: 'message',
+      user: data.user || 'Аноним',
+      content: data.content,
+      timestamp: new Date().toLocaleTimeString()
+    });
+  });
+
+  socket.on('typing', (data) => {
+    socket.broadcast.emit('typing', data);
+  });
+
+  // Присоединение к комнате чата (для старого API)
   socket.on('join_chat', (chatId) => {
     socket.join(chatId);
     console.log(`👥 User ${socket.id} joined chat ${chatId}`);
   });
 
-  // Отправка сообщения
+  // Отправка сообщения (для старого API)
   socket.on('send_message', async (data) => {
     try {
       const { chatId, encryptedMessage, senderId } = data;

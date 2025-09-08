@@ -28,8 +28,13 @@ app.use('/socket.io', createProxyMiddleware({
   ws: true
 }));
 
-// Главная страница
+// Главная страница - простой чат
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'backend/public/simple-chat.html'));
+});
+
+// Старый интерфейс с регистрацией (на случай если понадобится)
+app.get('/auth', (req, res) => {
   res.sendFile(path.join(__dirname, 'backend/public/index.html'));
 });
 
