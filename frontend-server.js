@@ -37,7 +37,8 @@ app.use('/socket.io/socket.io.js', createProxyMiddleware({
 app.use('/socket.io', createProxyMiddleware({
   target: 'http://localhost:3000',
   changeOrigin: true,
-  ws: true
+  ws: true,
+  logLevel: 'debug'
 }));
 
 // Главная страница - WhatsApp-подобный чат  
