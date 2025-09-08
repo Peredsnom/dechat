@@ -438,8 +438,13 @@
         
         function connectWebSocket() {
             try {
-                // Подключаемся к Socket.io через проксирование
-                const socket = io('/', {
+                // Подключаемся напрямую к backend через публичный URL
+                const backendUrl = window.location.hostname.includes('replit') ? 
+                    `https://${window.location.hostname.replace('-5000', '-3000')}` : 
+                    'http://localhost:3000';
+                    
+                console.log('🔄 Подключаемся к:', backendUrl);
+                const socket = io(backendUrl, {
                     transports: ['websocket', 'polling'],
                     forceNew: true
                 });
