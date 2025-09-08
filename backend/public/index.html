@@ -285,7 +285,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ name, email, password })
+                    body: JSON.stringify({ username: name, email, password })
                 });
 
                 const data = await response.json();
@@ -369,7 +369,7 @@
                 const messageData = {
                     chatId: defaultChatId,
                     encryptedMessage: messageText, // В реальном приложении здесь должно быть шифрование
-                    senderId: currentUser.id
+                    senderId: currentUser._id
                 };
                 
                 socket.emit('send_message', messageData);
@@ -382,7 +382,7 @@
             const messagesContainer = document.getElementById('messages');
             const messageEl = document.createElement('div');
             
-            const isOwnMessage = message.senderId === currentUser.id;
+            const isOwnMessage = message.senderId === currentUser._id;
             messageEl.className = `message ${isOwnMessage ? 'own' : ''}`;
             
             const time = new Date(message.timestamp).toLocaleTimeString();
