@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💬 DeChat - Простой чат</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .chat-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .name-input {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .name-input input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .name-input button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            min-height: 300px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 12px;
+            max-width: 80%;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .message.own {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .message.other {
+            background: #e9ecef;
+            color: #333;
+        }
+        
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            text-align: center;
+            font-style: italic;
+            max-width: 100%;
+        }
+        
+        .message-info {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        
+        .message-text {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .input-area button {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .hidden { display: none; }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+            color: #28a745;
+            background: #d4edda;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            💬 DeChat - Простой чат
+        </div>
+        
+        <!-- Ввод имени -->
+        <div id="nameSection" class="name-input">
+            <input type="text" id="nameInput" placeholder="Введите ваше имя..." maxlength="20">
+            <button onclick="joinChat()">Войти в чат</button>
+        </div>
+        
+        <!-- Чат -->
+        <div id="chatSection" class="chat-area hidden">
+            <div class="status" id="status">Добро пожаловать в чат!</div>
+            <div class="messages" id="messages"></div>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="Введите сообщение..." maxlength="300">
+                <button onclick="sendMessage()">➤</button>
+            </div>
+            <button onclick="leaveChat()" style="margin-top: 10px; background: #dc3545; width: 100%; padding: 8px; border: none; border-radius: 5px; color: white; cursor: pointer;">Покинуть чат</button>
+        </div>
+    </div>
+
+    <script>
+        let userName = '';
+        let messageCount = 0;
+        
+        // Демо-пользователи для имитации активности
+        const demoUsers = ['Анна', 'Михаил', 'Елена', 'Дмитрий', 'Ольга'];
+        const demoMessages = [
+            'Привет всем! 👋',
+            'Как дела?',
+            'Отличная погода сегодня',
+            'Кто-нибудь работает над интересными проектами?',
+            'Согласен с предыдущим сообщением',
+            'Хорошая идея!',
+            'Спасибо за информацию',
+            'Кстати, вы знали, что...',
+            'Интересно! Расскажите больше',
+            'Отлично! 🎉'
+        ];
+        
+        function joinChat() {
+            const nameInput = document.getElementById('nameInput');
+            userName = nameInput.value.trim();
+            
+            if (!userName) {
+                alert('Пожалуйста, введите ваше имя');
+                return;
+            }
+            
+            document.getElementById('nameSection').classList.add('hidden');
+            document.getElementById('chatSection').classList.remove('hidden');
+            
+            addMessage('system', `${userName} присоединился к чату`);
+            
+            // Приветственное сообщение
+            setTimeout(() => {
+                addMessage('other', 'Добро пожаловать! 👋', getRandomUser());
+            }, 1000);
+            
+            // Запуск периодических сообщений от других пользователей
+            startDemoActivity();
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            
+            if (!text) return;
+            
+            addMessage('own', text, userName);
+            input.value = '';
+            messageCount++;
+            
+            // Иногда генерируем ответ
+            if (Math.random() > 0.6) {
+                setTimeout(() => {
+                    addMessage('other', getRandomMessage(), getRandomUser());
+                }, 500 + Math.random() * 2000);
+            }
+        }
+        
+        function addMessage(type, text, sender = '') {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const time = new Date().toLocaleTimeString().slice(0, 5);
+            
+            if (type === 'system') {
+                messageDiv.innerHTML = `<div class="message-text">${text}</div>`;
+            } else {
+                const senderText = type === 'own' ? 'Вы' : sender;
+                messageDiv.innerHTML = `
+                    <div class="message-info">${senderText} • ${time}</div>
+                    <div class="message-text">${text}</div>
+                `;
+            }
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        function getRandomUser() {
+            return demoUsers[Math.floor(Math.random() * demoUsers.length)];
+        }
+        
+        function getRandomMessage() {
+            return demoMessages[Math.floor(Math.random() * demoMessages.length)];
+        }
+        
+        function startDemoActivity() {
+            // Периодические сообщения каждые 5-15 секунд
+            setInterval(() => {
+                if (Math.random() > 0.7) { // 30% шанс
+                    addMessage('other', getRandomMessage(), getRandomUser());
+                }
+            }, 5000 + Math.random() * 10000);
+        }
+        
+        function leaveChat() {
+            addMessage('system', `${userName} покинул чат`);
+            
+            setTimeout(() => {
+                document.getElementById('chatSection').classList.add('hidden');
+                document.getElementById('nameSection').classList.remove('hidden');
+                document.getElementById('messages').innerHTML = '';
+                document.getElementById('nameInput').value = '';
+                userName = '';
+            }, 1000);
+        }
+        
+        // Обработка Enter для отправки сообщений
+        document.getElementById('nameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinChat();
+        });
+        
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        // Фокус на поле ввода имени при загрузке
+        window.onload = () => {
+            document.getElementById('nameInput').focus();
+        };
+    </script>
+</body>
+</html>
