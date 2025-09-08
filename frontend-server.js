@@ -5,6 +5,12 @@ const path = require('path');
 const app = express();
 const PORT = 5000;
 
+// Отключение кэширования для разработки
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
 // Статические файлы (веб-интерфейс)
 app.use(express.static(path.join(__dirname, 'backend/public')));
 
