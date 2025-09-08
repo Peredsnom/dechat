@@ -381,6 +381,7 @@
         let users = new Map(); // userId -> user data
         let messages = new Map(); // chatId -> messages array
         let ws = null;
+        let notificationsEnabled = false;
         
         // WebSocket URL (используем текущий домен)
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -396,6 +397,9 @@
             document.getElementById('currentUser').textContent = username;
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
+            
+            // Запрашиваем разрешение на уведомления
+            requestNotificationPermission();
             
             // Подключаемся к WebSocket для real-time общения
             connectWebSocket();
@@ -444,6 +448,12 @@
                     if (currentChatWith === data.sender || currentChatWith === data.recipient) {
                         displayMessage(data.text, data.sender, data.timestamp, data.sender === currentUser);
                         scrollToBottom();
+                    }
+                    
+                    // Показываем уведомление если сообщение не от нас
+                    if (data.sender !== currentUser) {
+                        showNotification(data.sender, data.text);
+                        playNotificationSound();
                     }
                 });
                 
@@ -724,6 +734,56 @@
                 localStorage.setItem('dechat_users', JSON.stringify(activeUsers));
             }
         });
+        
+        // Функции уведомлений
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                Notification.requestPermission().then(permission => {
+                    notificationsEnabled = permission === 'granted';
+                    console.log('Уведомления:', notificationsEnabled ? 'разрешены' : 'запрещены');
+                });
+            }
+        }
+        
+        function showNotification(sender, message) {
+            if (!notificationsEnabled || !('Notification' in window)) return;
+            
+            const notification = new Notification(`Новое сообщение от ${sender}`, {
+                body: message.length > 50 ? message.substring(0, 50) + '...' : message,
+                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%2325d366"/><text x="50" y="60" font-family="Arial" font-size="40" fill="white" text-anchor="middle">💬</text></svg>',
+                tag: 'dechat-message'
+            });
+            
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+            };
+            
+            setTimeout(() => notification.close(), 5000);
+        }
+        
+        function playNotificationSound() {
+            try {
+                // Создаем короткий звук уведомления
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (error) {
+                console.log('Звук уведомления недоступен');
+            }
+        }
         
         // Автофокус на поле ввода имени
         window.onload = () => {
