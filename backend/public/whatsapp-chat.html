@@ -413,10 +413,45 @@
         
         function connectWebSocket() {
             try {
-                // Простая эмуляция WebSocket через localStorage для локального тестирования
-                setupLocalStorage();
+                // Подключаемся к реальному Socket.io серверу
+                const socket = io('http://localhost:3000');
+                
+                socket.on('connect', () => {
+                    console.log('Подключен к серверу');
+                    // Регистрируем пользователя на сервере
+                    socket.emit('user_joined', { username: currentUser });
+                });
+                
+                socket.on('user_joined', (data) => {
+                    console.log('Пользователь присоединился:', data.username);
+                    if (data.username !== currentUser) {
+                        addUser(generateUserId(data.username), data.username, true);
+                    }
+                });
+                
+                socket.on('user_left', (data) => {
+                    console.log('Пользователь ушел:', data.username);
+                    removeUser(data.username);
+                });
+                
+                socket.on('users_list', (users) => {
+                    console.log('Список пользователей:', users);
+                    updateUsersFromServer(users);
+                });
+                
+                socket.on('new_message', (data) => {
+                    console.log('Новое сообщение:', data);
+                    if (currentChatWith === data.sender || currentChatWith === data.recipient) {
+                        displayMessage(data.text, data.sender, data.timestamp, data.sender === currentUser);
+                        scrollToBottom();
+                    }
+                });
+                
+                window.socket = socket; // Сохраняем глобально
+                
             } catch (error) {
-                console.log('WebSocket недоступен, используем локальный режим');
+                console.log('Socket.io недоступен, используем локальный режим');
+                setupLocalStorage();
             }
         }
         
@@ -577,22 +612,27 @@
             const message = {
                 text: text,
                 sender: currentUser,
-                timestamp: Date.now(),
-                chatId: getChatId(currentUser, currentChatWith)
+                recipient: currentChatWith,
+                timestamp: Date.now()
             };
             
-            // Сохраняем сообщение в localStorage
-            const allMessages = JSON.parse(localStorage.getItem('dechat_messages') || '{}');
-            const chatId = getChatId(currentUser, currentChatWith);
-            
-            if (!allMessages[chatId]) {
-                allMessages[chatId] = [];
+            // Отправляем через Socket.io если доступен
+            if (window.socket && window.socket.connected) {
+                window.socket.emit('send_message', message);
+            } else {
+                // Fallback к localStorage
+                const allMessages = JSON.parse(localStorage.getItem('dechat_messages') || '{}');
+                const chatId = getChatId(currentUser, currentChatWith);
+                
+                if (!allMessages[chatId]) {
+                    allMessages[chatId] = [];
+                }
+                
+                allMessages[chatId].push(message);
+                localStorage.setItem('dechat_messages', JSON.stringify(allMessages));
             }
             
-            allMessages[chatId].push(message);
-            localStorage.setItem('dechat_messages', JSON.stringify(allMessages));
-            
-            // Отображаем сообщение
+            // Отображаем сообщение локально
             displayMessage(text, currentUser, Date.now(), true);
             input.value = '';
             
@@ -638,23 +678,27 @@
             return div.innerHTML;
         }
         
-        function simulateOtherUsers() {
-            // Эмулируем появление других пользователей для демонстрации
-            const demoUsers = ['Анна', 'Михаил', 'Елена', 'Дмитрий'];
+        function updateUsersFromServer(users) {
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = '';
             
-            demoUsers.forEach((name, index) => {
-                if (name !== currentUser) {
-                    setTimeout(() => {
-                        let activeUsers = JSON.parse(localStorage.getItem('dechat_users') || '{}');
-                        activeUsers[name] = {
-                            name: name,
-                            lastSeen: Date.now(),
-                            online: true
-                        };
-                        localStorage.setItem('dechat_users', JSON.stringify(activeUsers));
-                    }, (index + 1) * 1000);
+            users.forEach(user => {
+                if (user.username !== currentUser) {
+                    addUser(generateUserId(user.username), user.username, user.online);
                 }
             });
+        }
+        
+        function removeUser(username) {
+            const userId = generateUserId(username);
+            const userElement = document.querySelector(`[data-user-id="${userId}"]`);
+            if (userElement) {
+                userElement.remove();
+            }
+        }
+        
+        function simulateOtherUsers() {
+            // Больше не нужно - пользователи приходят с сервера
         }
         
         // Поиск пользователей
