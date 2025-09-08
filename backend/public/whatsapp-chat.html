@@ -414,7 +414,7 @@
         function connectWebSocket() {
             try {
                 // Подключаемся к реальному Socket.io серверу
-                const socket = io('http://localhost:3000');
+                const socket = io(); // Подключение к тому же домену
                 
                 socket.on('connect', () => {
                     console.log('Подключен к серверу');
