@@ -7,7 +7,13 @@ const PORT = 5000;
 
 // Отключение кэширования для разработки
 app.use((req, res, next) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'ETag': false,
+    'Last-Modified': false
+  });
   next();
 });
 
