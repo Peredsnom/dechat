@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>DeChat Debug</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; width: 200px; }
+        .result { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 DeChat Debug Console</h1>
+
+        <div class="section">
+            <h3>📊 Статус сервера</h3>
+            <div id="serverStatus" class="status warning">Проверка...</div>
+            <button onclick="checkServer()">Проверить сервер</button>
+        </div>
+
+        <div class="section">
+            <h3>🗄️ Статус базы данных</h3>
+            <div id="dbStatus" class="status warning">Проверка...</div>
+            <button onclick="checkDatabase()">Проверить БД</button>
+        </div>
+
+        <div class="section">
+            <h3>🔐 Регистрация пользователя</h3>
+            <input type="text" id="regUsername" placeholder="Username" value="testuser">
+            <input type="email" id="regEmail" placeholder="Email" value="test@example.com">
+            <input type="password" id="regPassword" placeholder="Password" value="password123">
+            <button onclick="registerUser()">Зарегистрировать</button>
+            <div id="regResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🚪 Вход пользователя</h3>
+            <input type="email" id="loginEmail" placeholder="Email" value="test@example.com">
+            <input type="password" id="loginPassword" placeholder="Password" value="password123">
+            <button onclick="loginUser()">Войти</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📋 Тестирование API</h3>
+            <button onclick="testHealth()">Health Check</button>
+            <button onclick="testAuth()">Test Auth</button>
+            <button onclick="testChat()">Test Chat</button>
+            <div id="apiResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📝 Лог операций</h3>
+            <div id="log" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEl = document.getElementById('log');
+            logEl.innerHTML += `[${timestamp}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+
+        async function checkServer() {
+            log('🔍 Проверка сервера...');
+            const statusEl = document.getElementById('serverStatus');
+
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.className = 'status success';
+                    statusEl.textContent = '✅ Сервер работает: ' + data.status;
+                    log('✅ Сервер отвечает корректно');
+                } else {
+                    throw new Error('Server error: ' + response.status);
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Ошибка сервера: ' + error.message;
+                log('❌ Ошибка сервера: ' + error.message);
+            }
+        }
+
+        async function checkDatabase() {
+            log('🔍 Проверка базы данных...');
+            const statusEl = document.getElementById('dbStatus');
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: 'db_test_' + Date.now(),
+                        email: 'db_test_' + Date.now() + '@example.com',
+                        password: 'test123'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    statusEl.className = 'status success';
+                    statusEl.textContent = '✅ База данных работает: пользователь создан';
+                    log('✅ База данных подключена и работает');
+                } else {
+                    const error = await response.text();
+                    throw new Error('Database error: ' + error);
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Ошибка базы данных: ' + error.message;
+                log('❌ Ошибка базы данных: ' + error.message);
+            }
+        }
+
+        async function registerUser() {
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+
+            if (!username || !email || !password) {
+                alert('Заполните все поля!');
+                return;
+            }
+
+            log(`🔐 Регистрация пользователя: ${username}`);
+
+            const resultEl = document.getElementById('regResult');
+            resultEl.textContent = 'Загрузка...';
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultEl.textContent = '✅ УСПЕХ:\n' + JSON.stringify(data, null, 2);
+                    log('✅ Пользователь зарегистрирован успешно');
+                    if (data.token) {
+                        authToken = data.token;
+                        log('🔑 Токен получен');
+                    }
+                } else {
+                    resultEl.textContent = '❌ ОШИБКА:\n' + JSON.stringify(data, null, 2);
+                    log('❌ Ошибка регистрации: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                resultEl.textContent = '❌ СЕТЕВАЯ ОШИБКА:\n' + error.message;
+                log('❌ Сетевая ошибка при регистрации: ' + error.message);
+            }
+        }
+
+        async function loginUser() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                alert('Заполните все поля!');
+                return;
+            }
+
+            log(`🚪 Попытка входа: ${email}`);
+
+            const resultEl = document.getElementById('loginResult');
+            resultEl.textContent = 'Загрузка...';
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultEl.textContent = '✅ УСПЕХ:\n' + JSON.stringify(data, null, 2);
+                    log('✅ Вход выполнен успешно');
+                    if (data.token) {
+                        authToken = data.token;
+                        log('🔑 Токен получен');
+                    }
+                } else {
+                    resultEl.textContent = '❌ ОШИБКА:\n' + JSON.stringify(data, null, 2);
+                    log('❌ Ошибка входа: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                resultEl.textContent = '❌ СЕТЕВАЯ ОШИБКА:\n' + error.message;
+                log('❌ Сетевая ошибка при входе: ' + error.message);
+            }
+        }
+
+        async function testHealth() {
+            const resultEl = document.getElementById('apiResult');
+            resultEl.textContent = 'Тестирование /health...';
+
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                resultEl.textContent = '✅ Health Check:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = '❌ Ошибка:\n' + error.message;
+            }
+        }
+
+        async function testAuth() {
+            const resultEl = document.getElementById('apiResult');
+            resultEl.textContent = 'Тестирование /api/auth/profile...';
+
+            try {
+                const response = await fetch('/api/auth/profile', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                resultEl.textContent = '✅ Auth Test:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = '❌ Ошибка:\n' + error.message;
+            }
+        }
+
+        async function testChat() {
+            const resultEl = document.getElementById('apiResult');
+            resultEl.textContent = 'Тестирование /api/chat/chats...';
+
+            try {
+                const response = await fetch('/api/chat/chats', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                resultEl.textContent = '✅ Chat Test:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = '❌ Ошибка:\n' + error.message;
+            }
+        }
+
+        // Автоматическая проверка при загрузке
+        window.onload = function() {
+            log('🚀 DeChat Debug Console запущен');
+            setTimeout(() => {
+                checkServer();
+                checkDatabase();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

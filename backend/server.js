@@ -48,8 +48,30 @@ const chatRoutes = require('./routes/chat');
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 
+// История 1:1 сообщений (перенесено из конца файла)
+app.get('/api/direct/messages', async (req, res) => {
+  try {
+    console.log('📜 GET /api/direct/messages, query:', req.query);
+    const { me, peer, limit = 100 } = req.query;
+    if (!me || !peer) {
+      return res.status(400).json({ error: 'me and peer are required' });
+    }
+    const DirectMessage = require('./models/DirectMessage');
+    const conversationId = [String(me), String(peer)].sort().join('::');
+    const items = await DirectMessage.find({ conversationId })
+      .sort({ timestamp: 1 })
+      .limit(parseInt(limit));
+    console.log('📜 Found', items.length, 'messages for', conversationId);
+    res.json({ messages: items.map(m => ({ sender: m.sender, recipient: m.recipient, text: m.text, timestamp: m.timestamp })) });
+  } catch (err) {
+    console.error('Load direct history error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Хранилище подключенных пользователей
 const connectedUsers = new Map(); // socketId -> userData
+const usernameToSocketId = new Map(); // username -> socketId
 
 // Socket.IO обработчики
 io.on('connection', (socket) => {
@@ -57,7 +79,7 @@ io.on('connection', (socket) => {
   
   // Пользователь присоединился к чату
   socket.on('user_joined', (data) => {
-    console.log(`👤 User joined: ${data.username}`);
+    console.log(`👤 User joined: ${data.username}, socketId: ${socket.id}`);
     
     // Сохраняем пользователя
     connectedUsers.set(socket.id, {
@@ -65,6 +87,10 @@ io.on('connection', (socket) => {
       online: true,
       socketId: socket.id
     });
+    usernameToSocketId.set(data.username, socket.id);
+    console.log(`🗂️ usernameToSocketId map:`, Array.from(usernameToSocketId.entries()));
+    // Комната пользователя (на случай нескольких вкладок)
+    try { socket.join(`user:${data.username}`); } catch (e) {}
     
     // Уведомляем всех о новом пользователе
     socket.broadcast.emit('user_joined', { username: data.username });
@@ -77,71 +103,52 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('users_list', usersList);
   });
   
-  // Отправка личного сообщения
-  socket.on('send_message', (data) => {
-    console.log(`💬 Message from ${data.sender} to ${data.recipient}: ${data.text}`);
-    
-    // Находим сокет получателя
-    const recipientSocket = Array.from(connectedUsers.entries())
-      .find(([id, user]) => user.username === data.recipient);
-    
-    if (recipientSocket) {
-      // Отправляем сообщение получателю
-      io.to(recipientSocket[0]).emit('new_message', data);
+  // Отправка личного сообщения (1:1)
+  socket.on('send_message', async (data) => {
+    // Ветка комнат (старого API) обрабатывается ниже, здесь 1:1 если нет chatId
+    if (data && !data.chatId && data.sender && data.recipient && data.text) {
+      try {
+        const payload = {
+          sender: data.sender,
+          recipient: data.recipient,
+          text: data.text,
+          timestamp: data.timestamp || Date.now()
+        };
+
+        // Сохраняем историю
+        try {
+          const DirectMessage = require('./models/DirectMessage');
+          const conversationId = [payload.sender, payload.recipient].sort().join('::');
+          await DirectMessage.create({
+            conversationId,
+            sender: payload.sender,
+            recipient: payload.recipient,
+            text: payload.text,
+            timestamp: payload.timestamp
+          });
+        } catch (e) {
+          console.error('DirectMessage save error:', e.message);
+        }
+
+        // Отправляем получателю (если онлайн)
+        const recipientSocketId = usernameToSocketId.get(payload.recipient);
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit('new_message', payload);
+        }
+
+        // Эхо отправителю (не дублировать на фронте второй раз)
+        socket.emit('new_message', payload);
+        return;
+      } catch (err) {
+        console.error('Direct send_message error:', err);
+        socket.emit('error', { message: 'Failed to send direct message' });
+        return;
+      }
     }
-    
-    // Также отправляем отправителю для синхронизации
-    socket.emit('new_message', data);
+    // иначе продолжит обработчик комнат ниже
   });
   
-  // WebRTC обработчики для голосовых звонков
-  socket.on('call_offer', (data) => {
-    console.log(`📞 Call offer from ${data.caller} to ${data.callee}`);
-    
-    // Находим сокет получателя
-    const recipientSocket = Array.from(connectedUsers.entries())
-      .find(([id, user]) => user.username === data.callee);
-    
-    if (recipientSocket) {
-      io.to(recipientSocket[0]).emit('call_offer', data);
-    }
-  });
-  
-  socket.on('call_answer', (data) => {
-    console.log(`📞 Call answer from ${data.callee} to ${data.caller}`);
-    
-    // Находим сокет звонящего
-    const callerSocket = Array.from(connectedUsers.entries())
-      .find(([id, user]) => user.username === data.caller);
-    
-    if (callerSocket) {
-      io.to(callerSocket[0]).emit('call_answer', data);
-    }
-  });
-  
-  socket.on('ice_candidate', (data) => {
-    console.log(`🧊 ICE candidate for ${data.targetUser}`);
-    
-    // Находим сокет получателя
-    const targetSocket = Array.from(connectedUsers.entries())
-      .find(([id, user]) => user.username === data.targetUser);
-    
-    if (targetSocket) {
-      io.to(targetSocket[0]).emit('ice_candidate', data);
-    }
-  });
-  
-  socket.on('call_ended', (data) => {
-    console.log(`📞 Call ended with ${data.targetUser}`);
-    
-    // Находим сокет получателя
-    const targetSocket = Array.from(connectedUsers.entries())
-      .find(([id, user]) => user.username === data.targetUser);
-    
-    if (targetSocket) {
-      io.to(targetSocket[0]).emit('call_ended', data);
-    }
-  });
+  // Старые WebRTC обработчики удалены - используем только новую систему voice_call_*
 
   // Простой анонимный чат (для совместимости)
   socket.on('message', (data) => {
@@ -164,8 +171,12 @@ io.on('connection', (socket) => {
     console.log(`👥 User ${socket.id} joined chat ${chatId}`);
   });
 
-  // Отправка сообщения (для старого API)
+  // Отправка сообщения в комнату чата (для старого API чатов)
   socket.on('send_message', async (data) => {
+    // Если нет chatId — это не сообщение комнаты, игнорируем, чтобы не мешать 1:1 сообщениям
+    if (!data || !data.chatId) {
+      return;
+    }
     try {
       const { chatId, encryptedMessage, senderId } = data;
 
@@ -195,23 +206,56 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Голосовой вызов
+  // Голосовой вызов (маршрутизация по username -> socketId)
   socket.on('voice_call_request', (data) => {
-    const { targetUserId, callerId, offer } = data;
-    socket.to(targetUserId).emit('incoming_call', {
-      callerId,
-      offer
-    });
+    try {
+      const { targetUserId, callerId, offer } = data || {};
+      if (!targetUserId) return;
+      const targetSocketId = usernameToSocketId.get(targetUserId) || null;
+      console.log('voice_call_request:', { from: callerId, to: targetUserId, targetSocketId });
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('incoming_call', { callerId, offer });
+        console.log(`➡️ incoming_call sent to ${targetUserId} via socketId`);
+      } else {
+        // Резерв: посылаем в комнату пользователя если нет прямого socketId
+        io.to(`user:${targetUserId}`).emit('incoming_call', { callerId, offer });
+        console.log(`➡️ incoming_call sent to ${targetUserId} via room`);
+      }
+    } catch (e) {
+      console.error('voice_call_request error:', e);
+    }
   });
 
   socket.on('voice_call_answer', (data) => {
-    const { callerId, answer } = data;
-    socket.to(callerId).emit('call_answered', { answer });
+    try {
+      const { callerId, answer } = data || {};
+      if (!callerId) return;
+      const callerSocketId = usernameToSocketId.get(callerId) || null;
+      console.log('voice_call_answer:', { to: callerId, callerSocketId, answer });
+      if (callerSocketId) {
+        io.to(callerSocketId).emit('call_answered', { answer });
+        console.log(`➡️ call_answered sent to ${callerId} via socketId`);
+      } else {
+        io.to(`user:${callerId}`).emit('call_answered', { answer });
+        console.log(`➡️ call_answered sent to ${callerId} via room`);
+      }
+    } catch (e) {
+      console.error('voice_call_answer error:', e);
+    }
   });
 
   socket.on('ice_candidate', (data) => {
-    const { targetUserId, candidate } = data;
-    socket.to(targetUserId).emit('ice_candidate', { candidate });
+    try {
+      const { targetUserId, candidate } = data || {};
+      if (!targetUserId) return;
+      const targetSocketId = usernameToSocketId.get(targetUserId) || null;
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('ice_candidate', { candidate });
+      }
+      io.to(`user:${targetUserId}`).emit('ice_candidate', { candidate });
+    } catch (e) {
+      console.error('ice_candidate error:', e);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -221,6 +265,9 @@ io.on('connection', (socket) => {
     const user = connectedUsers.get(socket.id);
     if (user) {
       connectedUsers.delete(socket.id);
+      if (user.username) {
+        usernameToSocketId.delete(user.username);
+      }
       
       // Уведомляем всех об уходе пользователя
       socket.broadcast.emit('user_left', { username: user.username });
@@ -238,6 +285,13 @@ io.on('connection', (socket) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
 });
+
+// Test route для отладки
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API работает', timestamp: new Date() });
+});
+
+// Удален дубликат - перенесен выше
 
 // 404 handler
 app.use('*', (req, res) => {

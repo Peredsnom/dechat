@@ -187,4 +187,29 @@ router.put('/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Поиск пользователя по email или username (для приглашения в чат)
+router.get('/users', async (req, res) => {
+  try {
+    const { email, username } = req.query;
+
+    if (!email && !username) {
+      return res.status(400).json({ error: 'Provide email or username' });
+    }
+
+    const query = email
+      ? { email: String(email).toLowerCase().trim() }
+      : { username: String(username).trim() };
+
+    const user = await User.findOne(query);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ user: user.toPublicData() });
+  } catch (error) {
+    console.error('Find user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

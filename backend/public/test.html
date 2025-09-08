@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>DeChat Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .online { background: #d4edda; color: #155724; }
+        .offline { background: #f8d7da; color: #721c24; }
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .messages { height: 300px; border: 1px solid #ccc; padding: 10px; overflow-y: auto; }
+        .message { margin: 5px 0; padding: 8px; border-radius: 4px; }
+        .sent { background: #007bff; color: white; margin-left: 50px; }
+        .received { background: #e9ecef; margin-right: 50px; }
+        input, button { padding: 8px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 DeChat - Локальное тестирование</h1>
+        
+        <div class="section">
+            <h3>📊 Статус</h3>
+            <div id="serverStatus" class="status offline">Проверка сервера...</div>
+            <div id="dbStatus" class="status offline">Проверка БД...</div>
+        </div>
+
+        <div class="section">
+            <h3>🔐 Вход</h3>
+            <input type="text" id="username" placeholder="Username" value="testuser1">
+            <input type="email" id="email" placeholder="Email" value="test1@example.com">
+            <input type="password" id="password" placeholder="Password" value="password123">
+            <button type="button" onclick="registerUser()">Регистрация</button>
+            <button onclick="login()">Вход</button>
+            <div id="userInfo" style="display: none;">
+                Пользователь: <span id="currentUser"></span>
+                <button onclick="logout()">Выход</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>💬 Чаты</h3>
+            <div class="grid">
+                <div>
+                    <h4>Пользователи онлайн</h4>
+                    <div id="usersList">Войдите для просмотра пользователей</div>
+                </div>
+                <div>
+                    <h4 id="chatTitle">Выберите собеседника</h4>
+                    <div class="section">
+                        <button id="callBtn" onclick="startCall()">📞 Звонок</button>
+                        <button id="hangupBtn" onclick="hangupCall()" style="display:none">📴 Завершить</button>
+                        <span id="callStatus">Готов к звонкам</span>
+                    </div>
+                    <div id="messages" class="messages">Выберите собеседника...</div>
+                    <input type="text" id="messageInput" placeholder="Сообщение..." onkeypress="handleKeyPress(event)">
+                    <button onclick="sendDirectMessage()">Отправить</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Лог</h3>
+            <div id="log" style="font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket, currentUser = null, currentToken = '', currentChatId = null;
+        let currentPeer = null;
+
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            document.getElementById('log').innerHTML = `[${time}] ${msg}<br>` + document.getElementById('log').innerHTML;
+            console.log(msg);
+        }
+
+        function initSocket() {
+            socket = io();
+            socket.on('connect', () => {
+                log('✅ Socket.IO подключен');
+                document.getElementById('serverStatus').className = 'status online';
+                document.getElementById('serverStatus').textContent = '✅ Сервер онлайн';
+                // Повторная регистрация при переподключении
+                if (currentUser?.username) {
+                    try { socket.emit('user_joined', { username: currentUser.username }); } catch (e) {}
+                }
+            });
+            socket.on('disconnect', () => {
+                log('❌ Socket.IO отключен');
+                document.getElementById('serverStatus').className = 'status offline';
+                document.getElementById('serverStatus').textContent = '❌ Сервер оффлайн';
+            });
+            socket.on('new_message', (data) => {
+                // Поддержка 1:1: {sender, recipient, text, timestamp}
+                if (!data?.chatId && data?.text && data?.sender) {
+                    // Показываем только входящие от собеседника, чтобы не дублировать своё эхо
+                    if (data.sender === currentPeer && data.sender !== currentUser?.username) {
+                        displayDirectMessage({ sender: data.sender, text: data.text, timestamp: data.timestamp || Date.now() });
+                    }
+                    return;
+                }
+                // Старые сообщения комнат
+                if (data.chatId === currentChatId) displayMessage(data);
+            });
+            socket.on('users_list', (users) => {
+                renderUsersList(users);
+            });
+            socket.on('incoming_call', (data) => {
+                log('📞 Входящий звонок от ' + data.callerId);
+                showIncomingCallDialog(data.callerId);
+            });
+            socket.on('call_answered', (data) => {
+                if (data.answer === 'accepted') {
+                    document.getElementById('callStatus').textContent = 'В разговоре';
+                    log('✅ Звонок принят собеседником');
+                } else if (data.answer === 'declined') {
+                    hangupCall();
+                    log('❌ Звонок отклонён собеседником');
+                }
+            });
+        }
+
+        async function checkDB() {
+            try {
+                const response = await fetch('/health');
+                await response.json();
+                document.getElementById('dbStatus').className = 'status online';
+                document.getElementById('dbStatus').textContent = '✅ MongoDB Atlas подключена';
+                log('✅ База данных онлайн');
+            } catch (error) {
+                document.getElementById('dbStatus').className = 'status offline';
+                document.getElementById('dbStatus').textContent = '❌ Ошибка БД';
+                log('❌ Ошибка БД: ' + error.message);
+            }
+        }
+
+        async function registerUser() {
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            // Валидация
+            if (!username || !email || !password) {
+                alert('❌ Заполните все поля!');
+                return;
+            }
+
+            if (username.length < 3) {
+                alert('❌ Имя пользователя должно быть не менее 3 символов!');
+                return;
+            }
+
+            if (password.length < 6) {
+                alert('❌ Пароль должен быть не менее 6 символов!');
+                return;
+            }
+
+            log(`🔐 Регистрация пользователя: ${username} (${email})`);
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✅ Регистрация успешна! Теперь можете войти с этими данными.');
+                    log('✅ Пользователь зарегистрирован: ' + JSON.stringify(data.user, null, 2));
+                    // Очищаем поля после успешной регистрации
+                    document.getElementById('username').value = '';
+                    document.getElementById('email').value = '';
+                    document.getElementById('password').value = '';
+                } else {
+                    const errorMsg = data.error || data.message || 'Неизвестная ошибка сервера';
+                    alert('❌ Ошибка регистрации: ' + errorMsg);
+                    log('❌ Ошибка регистрации: ' + JSON.stringify(data, null, 2));
+                }
+            } catch (error) {
+                alert('❌ Сетевая ошибка: ' + error.message + '\n\nПроверьте что сервер запущен на порту 3000');
+                log('❌ Сетевая ошибка при регистрации: ' + error.message);
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            // Валидация
+            if (!email || !password) {
+                alert('❌ Заполните email и пароль!');
+                return;
+            }
+
+            log(`🚪 Попытка входа: ${email}`);
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✅ Вход выполнен успешно!');
+                    currentToken = data.token;
+                    currentUser = data.user;
+                    showUser();
+                    // Сообщаем серверу о присутствии и получаем список онлайн
+                    try { socket?.emit('user_joined', { username: currentUser.username }); } catch (e) {}
+                    log('✅ Пользователь вошел: ' + JSON.stringify(data.user, null, 2));
+                } else {
+                    const errorMsg = data.error || data.message || 'Неверный email или пароль';
+                    alert('❌ Ошибка входа: ' + errorMsg);
+                    log('❌ Ошибка входа: ' + JSON.stringify(data, null, 2));
+
+                    // Подсказка для пользователя
+                    if (data.error && data.error.includes('Invalid email or password')) {
+                        setTimeout(() => {
+                            alert('💡 Подсказка: Убедитесь что:\n1. Пользователь зарегистрирован\n2. Email и пароль введены правильно\n3. Сервер подключен к MongoDB');
+                        }, 500);
+                    }
+                }
+            } catch (error) {
+                alert('❌ Сетевая ошибка: ' + error.message + '\n\nПроверьте что сервер запущен на порту 3000');
+                log('❌ Сетевая ошибка при входе: ' + error.message);
+            }
+        }
+
+        function showUser() {
+            document.getElementById('userInfo').style.display = 'block';
+            document.getElementById('currentUser').textContent = currentUser.username;
+        }
+
+        function logout() {
+            currentToken = '';
+            currentUser = null;
+            document.getElementById('userInfo').style.display = 'none';
+            document.getElementById('usersList').innerHTML = 'Войдите для просмотра пользователей';
+            log('👋 Выход');
+        }
+
+        async function createChat() {
+            if (!currentToken) { alert('Войдите в систему'); return; }
+            
+            const name = prompt('Название чата:');
+            if (!name) return;
+            
+            try {
+                const response = await fetch('/api/chat/chats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({ name, participants: [currentUser._id] })
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ Чат создан!');
+                    updateChatsList();
+                    log('✅ Чат создан: ' + name);
+                } else {
+                    alert('❌ Ошибка: ' + data.error);
+                }
+            } catch (error) {
+                alert('❌ Ошибка: ' + error.message);
+            }
+        }
+
+        async function createChatWithEmail() {
+            if (!currentToken) { alert('Войдите в систему'); return; }
+            const email = prompt('Email второго участника:');
+            if (!email) return;
+            try {
+                const userResp = await fetch(`/api/auth/users?email=${encodeURIComponent(email)}`);
+                const userData = await userResp.json();
+                if (!userResp.ok) {
+                    alert('Пользователь не найден: ' + (userData.error || '')); return;
+                }
+                const name = prompt('Название чата:', `Чат с ${userData.user.username}`) || `Чат с ${userData.user.username}`;
+                const response = await fetch('/api/chat/chats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    },
+                    body: JSON.stringify({ name, participants: [userData.user._id] })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert('✅ Чат создан!');
+                    updateChatsList();
+                    log('✅ Чат создан: ' + name);
+                } else {
+                    alert('❌ Ошибка: ' + data.error);
+                }
+            } catch (error) {
+                alert('❌ Ошибка: ' + error.message);
+            }
+        }
+
+        function renderUsersList(users) {
+            const list = document.getElementById('usersList');
+            if (!list) return;
+            list.innerHTML = '';
+            const unique = new Map();
+            (users || []).forEach(u => { if (u?.username) unique.set(u.username, u); });
+            unique.forEach((u, name) => {
+                if (!currentUser || name === currentUser.username) return;
+                const div = document.createElement('div');
+                div.style.cssText = 'padding: 8px; border: 1px solid #ccc; margin: 5px 0; cursor: pointer; display:flex; justify-content:space-between;';
+                div.onclick = () => selectPeer(name);
+                const status = u.online ? '🟢' : '⚪';
+                div.innerHTML = `<span>${name}</span><span>${status}</span>`;
+                list.appendChild(div);
+            });
+        }
+
+        function selectPeer(username) {
+            currentPeer = username;
+            document.getElementById('chatTitle').textContent = `💬 ${username}`;
+            document.getElementById('messages').innerHTML = '';
+            // Загрузка истории 1:1
+            loadDirectHistory(username);
+        }
+
+        async function loadDirectHistory(peer) {
+            try {
+                const url = `${window.location.origin}/api/direct/messages?me=${encodeURIComponent(currentUser.username)}&peer=${encodeURIComponent(peer)}&limit=200`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (resp.ok && Array.isArray(data.messages)) {
+                    data.messages.forEach(m => displayDirectMessage({ sender: m.sender, text: m.text, timestamp: m.timestamp }));
+                }
+            } catch (e) {
+                log('❌ Ошибка загрузки истории: ' + e.message);
+            }
+        }
+
+        function selectChat(chatId, chatName) {
+            currentChatId = chatId;
+            document.getElementById('chatTitle').textContent = `💬 ${chatName}`;
+            socket?.emit('join_chat', chatId);
+            loadMessages(chatId);
+            log(`👥 Выбран чат: ${chatName}`);
+        }
+
+        async function loadMessages(chatId) {
+            try {
+                const response = await fetch(`/api/chat/chats/${chatId}/messages`, {
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+                const data = await response.json();
+                
+                const messagesEl = document.getElementById('messages');
+                messagesEl.innerHTML = '';
+                
+                if (data.messages?.length > 0) {
+                    data.messages.forEach(msg => displayMessage(msg));
+                } else {
+                    messagesEl.innerHTML = '<p>Нет сообщений</p>';
+                }
+            } catch (error) {
+                log('❌ Ошибка загрузки сообщений: ' + error.message);
+            }
+        }
+
+        function displayMessage(message) {
+            const messagesEl = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${message.senderId === currentUser._id ? 'sent' : 'received'}`;
+            div.innerHTML = `
+                <strong>${message.senderId === currentUser._id ? 'Вы' : 'Собеседник'}:</strong><br>
+                ${message.encryptedContent}<br>
+                <small>${new Date(message.timestamp).toLocaleTimeString()}</small>
+            `;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function sendDirectMessage() {
+            if (!currentPeer) { alert('Выберите собеседника'); return; }
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+            const payload = {
+                sender: currentUser.username,
+                recipient: currentPeer,
+                text,
+                timestamp: Date.now()
+            };
+            // Отображаем сразу локально (эхо от сервера тоже придет, но мы фильтруем по отправителю)
+            displayDirectMessage({ sender: currentUser.username, text, timestamp: payload.timestamp });
+            socket?.emit('send_message', payload);
+            input.value = '';
+        }
+
+        function displayDirectMessage({ sender, text, timestamp }) {
+            const messagesEl = document.getElementById('messages');
+            const div = document.createElement('div');
+            const isOwn = sender === currentUser.username;
+            div.className = `message ${isOwn ? 'sent' : 'received'}`;
+            div.innerHTML = `
+                <strong>${isOwn ? 'Вы' : sender}:</strong><br>
+                ${text}<br>
+                <small>${new Date(timestamp).toLocaleTimeString()}</small>
+            `;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendDirectMessage();
+            }
+        }
+
+        // Голосовые вызовы (упрощенная версия)
+        async function startCall() {
+            if (!currentPeer) { alert('Выберите собеседника'); return; }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('🎤 Микрофон активирован');
+                log('📞 Отправляю voice_call_request к ' + currentPeer);
+                socket?.emit('voice_call_request', {
+                    targetUserId: currentPeer,
+                    callerId: currentUser.username,
+                    offer: 'fake_offer'
+                });
+                document.getElementById('callBtn').style.display = 'none';
+                document.getElementById('hangupBtn').style.display = 'inline';
+                document.getElementById('callStatus').textContent = 'Звоним...';
+                log('📞 Звонок инициирован');
+            } catch (error) {
+                alert('❌ Ошибка доступа к микрофону: ' + error.message);
+                log('❌ Ошибка звонка: ' + error.message);
+            }
+        }
+
+        function answerCall() {
+            document.getElementById('callStatus').textContent = 'В разговоре';
+            log('📞 Звонок принят');
+        }
+
+        function hangupCall() {
+            log('🔧 hangupCall() вызван');
+            document.getElementById('callBtn').style.display = 'inline';
+            document.getElementById('hangupBtn').style.display = 'none';
+            document.getElementById('callStatus').textContent = 'Готов к звонкам';
+            log('📴 Звонок завершен');
+        }
+
+        function showIncomingCallDialog(callerId) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.8); z-index: 9999; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            modal.innerHTML = `
+                <div style="background: white; padding: 30px; border-radius: 15px; text-align: center; min-width: 300px;">
+                    <h2>📞 Входящий звонок</h2>
+                    <p style="margin: 20px 0; font-size: 18px;">от <strong>${callerId}</strong></p>
+                    <button onclick="acceptCall('${callerId}')" style="background: #25d366; color: white; border: none; padding: 15px 30px; margin: 10px; border-radius: 25px; font-size: 16px; cursor: pointer;">✅ Принять</button>
+                    <button onclick="declineCall('${callerId}')" style="background: #ff4444; color: white; border: none; padding: 15px 30px; margin: 10px; border-radius: 25px; font-size: 16px; cursor: pointer;">❌ Отклонить</button>
+                </div>
+            `;
+            modal.id = 'incomingCallModal';
+            document.body.appendChild(modal);
+        }
+
+        function acceptCall(callerId) {
+            document.getElementById('incomingCallModal')?.remove();
+            answerCall();
+            socket.emit('voice_call_answer', { callerId, answer: 'accepted' });
+            log('✅ Звонок принят');
+        }
+
+        function declineCall(callerId) {
+            document.getElementById('incomingCallModal')?.remove();
+            socket.emit('voice_call_answer', { callerId, answer: 'declined' });
+            log('📞 Звонок отклонён');
+        }
+
+        // Инициализация
+        window.onload = function() {
+            log('🚀 Запуск DeChat...');
+            initSocket();
+            checkDB();
+            setInterval(checkDB, 30000);
+        };
+    </script>
+</body>
+</html>
