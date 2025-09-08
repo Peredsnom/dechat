@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DeChat</string>
+
+    <!-- Authentication -->
+    <string name="login_title">Войти в аккаунт</string>
+    <string name="register_title">Создать аккаунт</string>
+    <string name="username_hint">Имя пользователя</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Пароль</string>
+    <string name="confirm_password_hint">Подтвердите пароль</string>
+    <string name="login_button">Войти</string>
+    <string name="register_button">Зарегистрироваться</string>
+    <string name="no_account">Нет аккаунта? Зарегистрироваться</string>
+    <string name="has_account">Уже есть аккаунт? Войти</string>
+    <string name="show_password">Показать пароль</string>
+    <string name="hide_password">Скрыть пароль</string>
+
+    <!-- Chat -->
+    <string name="chats_title">Чаты</string>
+    <string name="message_hint">Введите сообщение...</string>
+    <string name="send_message">Отправить</string>
+    <string name="no_chats">Нет активных чатов</string>
+    <string name="no_chats_description">Создайте новый чат, чтобы начать общение</string>
+
+    <!-- Navigation -->
+    <string name="back">Назад</string>
+    <string name="settings">Настройки</string>
+    <string name="create_chat">Создать чат</string>
+    <string name="voice_call">Голосовой вызов</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Произошла ошибка</string>
+    <string name="error_network">Ошибка сети</string>
+    <string name="error_invalid_credentials">Неверный email или пароль</string>
+    <string name="error_password_mismatch">Пароли не совпадают</string>
+    <string name="error_empty_username">Введите имя пользователя</string>
+
+    <!-- Loading -->
+    <string name="loading">Загрузка...</string>
+
+    <!-- App description -->
+    <string name="app_description">Корпоративный чат с шифрованием</string>
+</resources>
