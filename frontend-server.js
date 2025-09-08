@@ -27,18 +27,15 @@ app.use('/api', createProxyMiddleware({
   ws: true // Поддержка WebSocket для Socket.io
 }));
 
-// Проксирование Socket.io статических файлов
-app.use('/socket.io/socket.io.js', createProxyMiddleware({
-  target: 'http://localhost:3000',
-  changeOrigin: true
-}));
-
-// Проксирование Socket.io WebSocket соединений
+// Проксирование Socket.io - СНАЧАЛА файлы, потом WebSocket
 app.use('/socket.io', createProxyMiddleware({
   target: 'http://localhost:3000',
   changeOrigin: true,
   ws: true,
-  logLevel: 'debug'
+  logLevel: 'silent',
+  pathRewrite: {
+    '^/socket.io': '/socket.io'
+  }
 }));
 
 // Главная страница - WhatsApp-подобный чат  

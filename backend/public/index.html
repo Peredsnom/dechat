@@ -439,12 +439,21 @@
         function connectWebSocket() {
             try {
                 // Подключаемся к Socket.io через проксирование
-                const socket = io();
+                const socket = io('/', {
+                    transports: ['websocket', 'polling'],
+                    forceNew: true
+                });
                 
                 socket.on('connect', () => {
-                    console.log('Подключен к серверу');
+                    console.log('✅ Подключен к серверу Socket.io');
                     // Регистрируем пользователя на сервере
                     socket.emit('user_joined', { username: currentUser });
+                });
+                
+                socket.on('connect_error', (error) => {
+                    console.error('❌ Ошибка подключения Socket.io:', error);
+                    console.log('⚠️ Переключаемся на локальный режим');
+                    setupLocalStorage();
                 });
                 
                 socket.on('user_joined', (data) => {
