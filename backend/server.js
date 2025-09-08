@@ -48,17 +48,55 @@ const chatRoutes = require('./routes/chat');
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 
+// Хранилище подключенных пользователей
+const connectedUsers = new Map(); // socketId -> userData
+
 // Socket.IO обработчики
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
   
-  // Автоматически присоединяем к общему чату
-  socket.join('general');
+  // Пользователь присоединился к чату
+  socket.on('user_joined', (data) => {
+    console.log(`👤 User joined: ${data.username}`);
+    
+    // Сохраняем пользователя
+    connectedUsers.set(socket.id, {
+      username: data.username,
+      online: true,
+      socketId: socket.id
+    });
+    
+    // Уведомляем всех о новом пользователе
+    socket.broadcast.emit('user_joined', { username: data.username });
+    
+    // Отправляем список всех пользователей новому клиенту
+    const usersList = Array.from(connectedUsers.values());
+    socket.emit('users_list', usersList);
+    
+    // Отправляем обновленный список всем остальным
+    socket.broadcast.emit('users_list', usersList);
+  });
+  
+  // Отправка личного сообщения
+  socket.on('send_message', (data) => {
+    console.log(`💬 Message from ${data.sender} to ${data.recipient}: ${data.text}`);
+    
+    // Находим сокет получателя
+    const recipientSocket = Array.from(connectedUsers.entries())
+      .find(([id, user]) => user.username === data.recipient);
+    
+    if (recipientSocket) {
+      // Отправляем сообщение получателю
+      io.to(recipientSocket[0]).emit('new_message', data);
+    }
+    
+    // Также отправляем отправителю для синхронизации
+    socket.emit('new_message', data);
+  });
 
-  // Простой анонимный чат
+  // Простой анонимный чат (для совместимости)
   socket.on('message', (data) => {
     console.log('📨 Message received:', data);
-    // Ретрансляция всем подключенным пользователям
     socket.broadcast.emit('message', {
       type: 'message',
       user: data.user || 'Аноним',
@@ -129,6 +167,21 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`🔌 User disconnected: ${socket.id}`);
+    
+    // Удаляем пользователя из списка
+    const user = connectedUsers.get(socket.id);
+    if (user) {
+      connectedUsers.delete(socket.id);
+      
+      // Уведомляем всех об уходе пользователя
+      socket.broadcast.emit('user_left', { username: user.username });
+      
+      // Отправляем обновленный список пользователей
+      const usersList = Array.from(connectedUsers.values());
+      socket.broadcast.emit('users_list', usersList);
+      
+      console.log(`👤 User left: ${user.username}`);
+    }
   });
 });
 
