@@ -439,7 +439,7 @@
         function connectWebSocket() {
             try {
                 // Подключаемся к реальному Socket.io серверу
-                const socket = io(); // Подключение к тому же домену
+                const socket = io('http://localhost:3000'); // Прямое подключение к бэкенду
                 
                 socket.on('connect', () => {
                     console.log('Подключен к серверу');
