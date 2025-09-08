@@ -93,6 +93,55 @@ io.on('connection', (socket) => {
     // Также отправляем отправителю для синхронизации
     socket.emit('new_message', data);
   });
+  
+  // WebRTC обработчики для голосовых звонков
+  socket.on('call_offer', (data) => {
+    console.log(`📞 Call offer from ${data.caller} to ${data.callee}`);
+    
+    // Находим сокет получателя
+    const recipientSocket = Array.from(connectedUsers.entries())
+      .find(([id, user]) => user.username === data.callee);
+    
+    if (recipientSocket) {
+      io.to(recipientSocket[0]).emit('call_offer', data);
+    }
+  });
+  
+  socket.on('call_answer', (data) => {
+    console.log(`📞 Call answer from ${data.callee} to ${data.caller}`);
+    
+    // Находим сокет звонящего
+    const callerSocket = Array.from(connectedUsers.entries())
+      .find(([id, user]) => user.username === data.caller);
+    
+    if (callerSocket) {
+      io.to(callerSocket[0]).emit('call_answer', data);
+    }
+  });
+  
+  socket.on('ice_candidate', (data) => {
+    console.log(`🧊 ICE candidate for ${data.targetUser}`);
+    
+    // Находим сокет получателя
+    const targetSocket = Array.from(connectedUsers.entries())
+      .find(([id, user]) => user.username === data.targetUser);
+    
+    if (targetSocket) {
+      io.to(targetSocket[0]).emit('ice_candidate', data);
+    }
+  });
+  
+  socket.on('call_ended', (data) => {
+    console.log(`📞 Call ended with ${data.targetUser}`);
+    
+    // Находим сокет получателя
+    const targetSocket = Array.from(connectedUsers.entries())
+      .find(([id, user]) => user.username === data.targetUser);
+    
+    if (targetSocket) {
+      io.to(targetSocket[0]).emit('call_ended', data);
+    }
+  });
 
   // Простой анонимный чат (для совместимости)
   socket.on('message', (data) => {

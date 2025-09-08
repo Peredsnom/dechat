@@ -382,6 +382,10 @@
         let messages = new Map(); // chatId -> messages array
         let ws = null;
         let notificationsEnabled = false;
+        let localStream = null;
+        let remoteStream = null;
+        let peerConnection = null;
+        let isInCall = false;
         
         // WebSocket URL (используем текущий домен)
         const wsUrl = `ws://${window.location.host}/ws`;
@@ -455,6 +459,23 @@
                         showNotification(data.sender, data.text);
                         playNotificationSound();
                     }
+                });
+                
+                // WebRTC события для звонков
+                socket.on('call_offer', (data) => {
+                    handleCallOffer(data);
+                });
+                
+                socket.on('call_answer', (data) => {
+                    handleCallAnswer(data);
+                });
+                
+                socket.on('ice_candidate', (data) => {
+                    handleIceCandidate(data);
+                });
+                
+                socket.on('call_ended', (data) => {
+                    endCall();
                 });
                 
                 window.socket = socket; // Сохраняем глобально
@@ -573,6 +594,9 @@
                 <div class="chat-header">
                     <div class="user-avatar" style="margin-right: 15px;">${username.charAt(0).toUpperCase()}</div>
                     <div class="chat-with">${username}</div>
+                    <div style="margin-left: auto; display: flex; gap: 10px;">
+                        <button onclick="startVoiceCall('${username}')" style="background: #25d366; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; font-size: 18px;">📞</button>
+                    </div>
                 </div>
                 <div class="chat-messages" id="chatMessages"></div>
                 <div class="typing-indicator" id="typingIndicator"></div>
@@ -783,6 +807,218 @@
             } catch (error) {
                 console.log('Звук уведомления недоступен');
             }
+        }
+        
+        // WebRTC функции для голосовых звонков
+        async function startVoiceCall(targetUser) {
+            if (isInCall) {
+                alert('Вы уже находитесь в звонке');
+                return;
+            }
+            
+            try {
+                // Получаем доступ к микрофону
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log('Микрофон подключен');
+                
+                // Создаем соединение
+                peerConnection = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+                
+                // Добавляем локальный поток
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+                
+                // Обработка удаленного потока
+                peerConnection.ontrack = (event) => {
+                    remoteStream = event.streams[0];
+                    playRemoteAudio(remoteStream);
+                };
+                
+                // Обработка ICE кандидатов
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate && window.socket) {
+                        window.socket.emit('ice_candidate', {
+                            candidate: event.candidate,
+                            targetUser: targetUser
+                        });
+                    }
+                };
+                
+                // Создаем offer
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                // Отправляем offer
+                if (window.socket) {
+                    window.socket.emit('call_offer', {
+                        offer: offer,
+                        caller: currentUser,
+                        callee: targetUser
+                    });
+                }
+                
+                isInCall = true;
+                showCallInterface(targetUser, 'outgoing');
+                
+            } catch (error) {
+                console.error('Ошибка при начале звонка:', error);
+                alert('Не удалось получить доступ к микрофону');
+            }
+        }
+        
+        async function handleCallOffer(data) {
+            if (isInCall) {
+                // Отклоняем звонок если уже в звонке
+                window.socket.emit('call_ended', { targetUser: data.caller });
+                return;
+            }
+            
+            const acceptCall = confirm(`Входящий звонок от ${data.caller}. Принять?`);
+            if (!acceptCall) {
+                window.socket.emit('call_ended', { targetUser: data.caller });
+                return;
+            }
+            
+            try {
+                // Получаем доступ к микрофону
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Создаем соединение
+                peerConnection = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+                
+                // Добавляем локальный поток
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+                
+                // Обработка удаленного потока
+                peerConnection.ontrack = (event) => {
+                    remoteStream = event.streams[0];
+                    playRemoteAudio(remoteStream);
+                };
+                
+                // Обработка ICE кандидатов
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate && window.socket) {
+                        window.socket.emit('ice_candidate', {
+                            candidate: event.candidate,
+                            targetUser: data.caller
+                        });
+                    }
+                };
+                
+                // Устанавливаем удаленное описание
+                await peerConnection.setRemoteDescription(data.offer);
+                
+                // Создаем answer
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                // Отправляем answer
+                window.socket.emit('call_answer', {
+                    answer: answer,
+                    caller: data.caller,
+                    callee: currentUser
+                });
+                
+                isInCall = true;
+                showCallInterface(data.caller, 'incoming');
+                
+            } catch (error) {
+                console.error('Ошибка при ответе на звонок:', error);
+                window.socket.emit('call_ended', { targetUser: data.caller });
+            }
+        }
+        
+        async function handleCallAnswer(data) {
+            try {
+                await peerConnection.setRemoteDescription(data.answer);
+                console.log('Звонок соединен');
+            } catch (error) {
+                console.error('Ошибка при обработке ответа:', error);
+            }
+        }
+        
+        async function handleIceCandidate(data) {
+            try {
+                if (peerConnection) {
+                    await peerConnection.addIceCandidate(data.candidate);
+                }
+            } catch (error) {
+                console.error('Ошибка ICE кандидата:', error);
+            }
+        }
+        
+        function playRemoteAudio(stream) {
+            const audio = document.createElement('audio');
+            audio.srcObject = stream;
+            audio.autoplay = true;
+            audio.style.display = 'none';
+            document.body.appendChild(audio);
+        }
+        
+        function showCallInterface(username, type) {
+            const callDiv = document.createElement('div');
+            callDiv.id = 'callInterface';
+            callDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                text-align: center;
+                z-index: 1001;
+                min-width: 300px;
+            `;
+            
+            callDiv.innerHTML = `
+                <h3>${type === 'outgoing' ? 'Звоним' : 'Разговор с'} ${username}</h3>
+                <div style="margin: 20px 0;">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: #25d366; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 40px; color: white;">
+                        ${username.charAt(0).toUpperCase()}
+                    </div>
+                </div>
+                <button onclick="endCall()" style="background: #ff4444; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 16px; cursor: pointer;">
+                    Завершить звонок
+                </button>
+            `;
+            
+            document.body.appendChild(callDiv);
+        }
+        
+        function endCall() {
+            // Закрываем потоки
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            // Закрываем соединение
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            
+            // Удаляем интерфейс звонка
+            const callInterface = document.getElementById('callInterface');
+            if (callInterface) {
+                callInterface.remove();
+            }
+            
+            // Удаляем аудио элементы
+            document.querySelectorAll('audio').forEach(audio => audio.remove());
+            
+            isInCall = false;
+            
+            console.log('Звонок завершен');
         }
         
         // Автофокус на поле ввода имени
