@@ -34,9 +34,9 @@ app.use('/socket.io', createProxyMiddleware({
   ws: true
 }));
 
-// Главная страница - простой чат  
+// Главная страница - WhatsApp-подобный чат  
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'backend/public/chat.html'));
+  res.sendFile(path.join(__dirname, 'backend/public/whatsapp-chat.html'));
 });
 
 // Старый интерфейс с регистрацией (на случай если понадобится)
